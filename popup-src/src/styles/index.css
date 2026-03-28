@@ -1,0 +1,65 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --c-focus: #6366f1;
+  --c-focus-light: #eef2ff;
+  --c-success: #10b981;
+  --c-warning: #f59e0b;
+  --c-danger: #ef4444;
+  --c-surface: #ffffff;
+  --c-bg: #f8f7f5;
+  --c-border: #e8e6e1;
+  --c-text: #1a1917;
+  --c-muted: #6b6a65;
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family: 'DM Sans', system-ui, sans-serif;
+  background: var(--c-bg);
+  color: var(--c-text);
+  width: 400px;
+  min-height: 560px;
+  max-height: 640px;
+  overflow: hidden;
+}
+
+/* Scrollbar */
+::-webkit-scrollbar { width: 4px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: #d1cfca; border-radius: 2px; }
+
+/* Animations */
+@keyframes slideIn {
+  from { opacity: 0; transform: translateY(-8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+@keyframes pulse-ring {
+  0%   { transform: scale(1); opacity: 1; }
+  100% { transform: scale(1.6); opacity: 0; }
+}
+@keyframes shimmer {
+  0%   { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
+.slide-in { animation: slideIn 0.25s ease forwards; }
+
+.priority-high   { background: #fff1f0; color: #b91c1c; border-color: #fecaca; }
+.priority-medium { background: #fffbeb; color: #92400e; border-color: #fde68a; }
+.priority-low    { background: #f0fdf4; color: #166534; border-color: #bbf7d0; }
+
+.decision-allow  { color: #059669; }
+.decision-delay  { color: #d97706; }
+.decision-block  { color: #dc2626; }
+
+.source-gmail    { background: #fef2f2; color: #b91c1c; }
+.source-discord  { background: #f5f3ff; color: #5b21b6; }
+.source-whatsapp { background: #f0fdf4; color: #166534; }
