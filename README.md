@@ -118,6 +118,11 @@ Outputs a **0–100 interruptibility score** and **user state**:
 | 56–85 | Casual | Browsing |
 | 86–100 | Idle | Away from keyboard |
 
+<img width="1919" height="1021" alt="Screenshot 2026-03-29 111815" src="https://github.com/user-attachments/assets/3cf78dc0-ee19-4f0c-a3bf-ab37b9fdac87" />
+<img width="1919" height="977" alt="image" src="https://github.com/user-attachments/assets/0862e4e3-fa7b-4c64-aab1-d35840e89f07" />
+<img width="1919" height="959" alt="image" src="https://github.com/user-attachments/assets/edc28463-1f34-4b68-b945-1f6f046509fd" />
+
+
 ### Decision Engine (`decisionEngine.js`)
 
 For each notification, computes:
