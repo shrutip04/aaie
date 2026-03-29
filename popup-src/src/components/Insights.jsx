@@ -41,6 +41,7 @@ export default function Insights({ insights = {}, userState }) {
     cognitiveLoadLabel = 'LOW',
     nextSafeWindow = 'Monitoring...',
     focusStartTime = null,
+    learningData = null,
   } = insights;
 
   const focusMins = focusStartTime
@@ -63,7 +64,6 @@ export default function Insights({ insights = {}, userState }) {
         padding: '12px 14px', marginBottom: 10,
       }}>
         <CogLoadBar load={cognitiveLoad} label={cognitiveLoadLabel} />
-
         {cognitiveLoad > 60 && (
           <div style={{
             background: '#fef2f2', border: '1px solid #fca5a5',
@@ -93,7 +93,7 @@ export default function Insights({ insights = {}, userState }) {
       {/* Focus shield */}
       <div style={{
         background: '#f5f3ff', borderRadius: 10, border: '1px solid #c4b5fd',
-        padding: '12px 14px',
+        padding: '12px 14px', marginBottom: 10,
       }}>
         <div style={{ fontSize: 12, fontWeight: 700, color: '#6366f1', marginBottom: 2 }}>
           🛡 Focus shield active
@@ -105,6 +105,52 @@ export default function Insights({ insights = {}, userState }) {
           Current state: <strong>{userState}</strong>
         </div>
       </div>
+
+      {/* Learning Layer */}
+      {learningData?.totalInteractions > 0 && (
+        <div style={{
+          background: '#fff', borderRadius: 10, border: '1px solid #e8e6e1',
+          padding: '12px 14px',
+        }}>
+          <div style={{ fontSize: 11, color: '#9ca3af', marginBottom: 8, fontWeight: 600 }}>
+            🧠 LEARNING LAYER — {learningData.totalInteractions} interactions tracked
+          </div>
+
+          {learningData.topSenders?.length > 0 && (
+            <div style={{ marginBottom: 8 }}>
+              <div style={{ fontSize: 11, fontWeight: 600, color: '#059669', marginBottom: 4 }}>
+                ✓ Priority senders (auto-boosted)
+              </div>
+              {learningData.topSenders.map(s => (
+                <div key={s} style={{
+                  fontSize: 11, color: '#1a1917', padding: '3px 8px',
+                  background: '#f0fdf4', borderRadius: 5, marginBottom: 3,
+                  border: '1px solid #bbf7d0',
+                }}>
+                  {s}
+                </div>
+              ))}
+            </div>
+          )}
+
+          {learningData.mostDismissed?.length > 0 && (
+            <div>
+              <div style={{ fontSize: 11, fontWeight: 600, color: '#dc2626', marginBottom: 4 }}>
+                ✕ Frequent dismissals (auto-reduced)
+              </div>
+              {learningData.mostDismissed.map(s => (
+                <div key={s} style={{
+                  fontSize: 11, color: '#1a1917', padding: '3px 8px',
+                  background: '#fef2f2', borderRadius: 5, marginBottom: 3,
+                  border: '1px solid #fecaca',
+                }}>
+                  {s}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
 
     </div>
   );

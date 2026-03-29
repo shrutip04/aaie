@@ -1,4 +1,5 @@
 // decisionEngine.js - Pure logic, no dependencies
+import { detectTaskFromUrl, isRelevantToTask } from './taskRelevance.js';
 
 export const USER_STATES = {
   DEEP_FOCUS: 'Deep Focus',
@@ -26,7 +27,190 @@ export const INTENT = {
   INFO: 'INFO',
 };
 
-// Task keyword map per context
+// ─── Smoothing State ──────────────────────────────────────────────────────────
+
+let _smoothedScore = 50;
+let _pendingState = null;
+let _pendingCount = 0;
+
+export function resetSmoothing(towardScore) {
+  _smoothedScore = Math.round(_smoothedScore * 0.3 + towardScore * 0.7);
+  _pendingState = null;
+  _pendingCount = 0;
+}
+
+export function applyHysteresis(rawScore, currentState) {
+  _smoothedScore = Math.round(_smoothedScore * 0.1 + rawScore * 0.9);
+
+  const newState = rawScoreToState(_smoothedScore);
+
+  if (newState === currentState) {
+    _pendingState = null;
+    _pendingCount = 0;
+    return { score: _smoothedScore, state: currentState };
+  }
+
+  const movingToMoreFocus =
+    newState === USER_STATES.DEEP_FOCUS ||
+    (newState === USER_STATES.LIGHT_FOCUS && currentState === USER_STATES.CASUAL);
+
+  const threshold = movingToMoreFocus ? 1 : 1;
+
+  if (_pendingState === newState) {
+    _pendingCount++;
+  } else {
+    _pendingState = newState;
+    _pendingCount = 1;
+  }
+
+  if (_pendingCount >= threshold) {
+    _pendingState = null;
+    _pendingCount = 0;
+    return { score: _smoothedScore, state: newState };
+  }
+
+  return { score: _smoothedScore, state: currentState };
+}
+
+function rawScoreToState(score) {
+  if (score <= 45) return USER_STATES.DEEP_FOCUS;
+  if (score <= 68) return USER_STATES.LIGHT_FOCUS;
+  if (score <= 88) return USER_STATES.CASUAL;
+  return USER_STATES.IDLE;
+}
+
+export function scoreToUserState(score) {
+  if (score <= 45) return USER_STATES.DEEP_FOCUS;
+  if (score <= 68) return USER_STATES.LIGHT_FOCUS;
+  if (score <= 88) return USER_STATES.CASUAL;
+  return USER_STATES.IDLE;
+}
+
+// ─── URL Classification ───────────────────────────────────────────────────────
+
+const DEEP_FOCUS_URLS = [
+  'github.com', 'gitlab.com', 'bitbucket.org',
+  'vscode.dev', 'codesandbox.io', 'replit.com',
+  'codepen.io', 'jsfiddle.net', 'stackblitz.com',
+  'programiz.com', 'onlinegdb.com', 'ideone.com',
+  'onecompiler.com', 'hackerrank.com', 'leetcode.com',
+  'codeforces.com', 'geeksforgeeks.org', 'codechef.com',
+  'topcoder.com', 'interviewbit.com', 'w3schools.com',
+  'docs.google.com', 'notion.so', 'figma.com',
+  'overleaf.com', 'confluence.atlassian.com',
+  'linear.app', 'trello.com', 'jira.atlassian.com',
+  'stackoverflow.com', 'developer.mozilla.org',
+  'coursera.org', 'udemy.com',
+];
+
+const CASUAL_URLS = [
+  'youtube.com', 'twitter.com', 'x.com', 'reddit.com',
+  'instagram.com', 'netflix.com', 'twitch.tv',
+  'facebook.com', 'tiktok.com',
+];
+
+const COMM_URLS = [
+  'mail.google.com', 'slack.com', 'discord.com',
+  'teams.microsoft.com', 'web.whatsapp.com', 'telegram.org',
+];
+
+const MEETING_URLS = [
+  'zoom.us', 'meet.google.com', 'teams.microsoft.com',
+  'whereby.com', 'webex.com', 'around.co',
+];
+
+function classifyUrl(url) {
+  if (!url || url.startsWith('chrome://')) return 'neutral';
+  if (MEETING_URLS.some(u => url.includes(u))) return 'meeting';
+  if (DEEP_FOCUS_URLS.some(u => url.includes(u))) return 'deepfocus';
+  if (COMM_URLS.some(u => url.includes(u))) return 'comms';
+  if (CASUAL_URLS.some(u => url.includes(u))) return 'casual';
+  return 'neutral';
+}
+
+// ─── Interruptibility Score ───────────────────────────────────────────────────
+
+export function computeInterruptibilityScore(signals) {
+  const {
+    idleState,
+    tabUrl,
+    tabSwitchRate = 0,
+    timeSinceLastSwitch = 0,
+    typingSpeed = 0,
+    mouseActivity = 0,
+    mouseIdleMs = 0,
+  } = signals;
+
+  if (idleState === 'locked') return 100;
+  if (idleState === 'idle') return 95;
+
+  const urlType = classifyUrl(tabUrl);
+
+  if (urlType === 'meeting') return 8;
+
+  let score;
+  switch (urlType) {
+    case 'deepfocus': score = 20; break;
+    case 'comms':     score = 60; break;
+    case 'casual':    score = 78; break;
+    default:          score = 52; break;
+  }
+
+  if (typingSpeed > 20) {
+    score = Math.min(score, 12);
+  } else if (typingSpeed > 12) {
+    score = Math.min(score, 25);
+  } else if (typingSpeed > 5) {
+    score = Math.min(score, 45);
+  } else if (typingSpeed > 0) {
+    score = Math.min(score, 58);
+  } else {
+    if (urlType === 'deepfocus') {
+      score = Math.min(score + 12, 48);
+    } else if (urlType === 'casual') {
+      score = Math.min(score + 15, 95);
+    } else {
+      score = Math.min(score + 10, 80);
+    }
+  }
+
+  if (mouseIdleMs > 180000) {
+    if (urlType === 'deepfocus') {
+      score = Math.min(score + 5, 50);
+    } else {
+      score = Math.min(score + 22, 100);
+    }
+  } else if (mouseIdleMs > 60000) {
+    if (urlType !== 'deepfocus') {
+      score = Math.min(score + 10, 88);
+    }
+  }
+
+  if (mouseActivity > 150 && urlType !== 'deepfocus') {
+    score = Math.min(score + 8, 88);
+  }
+
+  if (tabSwitchRate > 10) {
+    score = Math.min(score + 30, 100);
+  } else if (tabSwitchRate > 6) {
+    score = Math.min(score + 15, 90);
+  } else if (tabSwitchRate > 3) {
+    score = Math.min(score + 6, 78);
+  }
+
+  if (timeSinceLastSwitch > 15 * 60 * 1000) {
+    score = Math.max(score - 22, 5);
+  } else if (timeSinceLastSwitch > 8 * 60 * 1000) {
+    score = Math.max(score - 14, 8);
+  } else if (timeSinceLastSwitch > 3 * 60 * 1000) {
+    score = Math.max(score - 7, 10);
+  }
+
+  return Math.round(Math.max(0, Math.min(100, score)));
+}
+
+// ─── Task Context ─────────────────────────────────────────────────────────────
+
 const TASK_KEYWORDS = {
   coding: ['bug', 'deploy', 'repo', 'pr', 'pull request', 'commit', 'error',
     'build', 'ci', 'pipeline', 'crash', 'fix', 'server', 'down', 'issue'],
@@ -36,19 +220,20 @@ const TASK_KEYWORDS = {
 };
 
 function detectTaskContext(tabUrl = '') {
-  if (['github', 'vscode', 'replit', 'codesandbox', 'leetcode', 'stackoverflow'].some(u => tabUrl.includes(u))) return 'coding';
-  if (['notion', 'docs.google', 'overleaf', 'figma'].some(u => tabUrl.includes(u))) return 'work';
-  if (['discord', 'slack', 'whatsapp', 'mail'].some(u => tabUrl.includes(u))) return 'comms';
+  const urlType = classifyUrl(tabUrl);
+  if (urlType === 'deepfocus') return 'coding';
+  if (urlType === 'meeting') return 'work';
+  if (urlType === 'comms') return 'comms';
   return 'general';
 }
 
-// Classify a raw notification into structured metadata
+// ─── Notification Classification ──────────────────────────────────────────────
+
 export function classifyNotification(notification, tabUrl = '') {
   const text = `${notification.subject || ''} ${notification.body || ''} ${notification.sender || ''}`.toLowerCase();
   const taskContext = detectTaskContext(tabUrl);
   const contextKeywords = TASK_KEYWORDS[taskContext] || [];
 
-  // Priority heuristics
   let priority = PRIORITY.LOW;
   const highKeywords = ['urgent', 'asap', 'emergency', 'critical', 'deadline', 'important',
     'action required', 'meeting', 'call', 'server', 'down', 'error', 'crash'];
@@ -58,19 +243,16 @@ export function classifyNotification(notification, tabUrl = '') {
   else if (medKeywords.some(k => text.includes(k))) priority = PRIORITY.MEDIUM;
   if (notification.senderImportant) priority = PRIORITY.HIGH;
 
-  // Intent classification
   let intent = INTENT.MESSAGE;
   if (text.includes('task') || text.includes('todo') || text.includes('deadline')) intent = INTENT.TASK;
   else if (text.includes('call') || text.includes('meet') || text.includes('zoom')) intent = INTENT.CALL;
   else if (text.includes('fyi') || text.includes('newsletter') || text.includes('update')) intent = INTENT.INFO;
 
-  // Task relevance (Engine 3)
   const matchedKeywords = contextKeywords.filter(k => text.includes(k));
   let relevance = 'LOW';
   if (matchedKeywords.length >= 2 || priority === PRIORITY.HIGH) relevance = 'HIGH';
   else if (matchedKeywords.length === 1 || priority === PRIORITY.MEDIUM) relevance = 'MEDIUM';
 
-  // Interruption cost (Engine 4)
   const interruptionCost = notification._typingSpeed
     ? Math.min(100, (notification._typingSpeed * 3) + (notification._sessionMinutes || 0) * 2)
     : 0;
@@ -87,19 +269,30 @@ export function classifyNotification(notification, tabUrl = '') {
   };
 }
 
-// Core decision engine
+// ─── Decision Engine ──────────────────────────────────────────────────────────
+
 export function makeDecision(notification, context) {
-  const { userState, interruptibilityScore, typingSpeed = 0 } = context;
+  const { userState, interruptibilityScore, typingSpeed = 0, tabUrl = '' } = context;
   const { priority, relevance } = notification;
+
+  // ── Task-Relevance Gate ──────────────────────────────────────────────────
+  const taskType     = detectTaskFromUrl(tabUrl);
+  const taskRelevant = isRelevantToTask(notification, taskType);
+
+  if (!taskRelevant && userState !== USER_STATES.IDLE && userState !== USER_STATES.CASUAL) {
+    return { ...notification, decision: DECISIONS.BLOCK, reason: 'Blocked — not relevant to your current task' };
+  }
+  // ─────────────────────────────────────────────────────────────────────────
 
   let decision = DECISIONS.ALLOW;
   let reason = '';
 
-  const extremeWork = typingSpeed > 25 && interruptibilityScore < 15;
+  const extremeWork = typingSpeed > 20 && interruptibilityScore < 20;
 
   if (userState === USER_STATES.IDLE) {
     decision = DECISIONS.ALLOW;
     reason = 'User is idle — delivering all';
+
   } else if (userState === USER_STATES.DEEP_FOCUS) {
     if (priority === PRIORITY.HIGH && relevance === 'HIGH') {
       decision = DECISIONS.ALLOW;
@@ -107,103 +300,55 @@ export function makeDecision(notification, context) {
     } else if (priority === PRIORITY.HIGH && !extremeWork) {
       decision = DECISIONS.ALLOW;
       reason = 'High priority — allowed during deep focus';
+    } else if (priority === PRIORITY.HIGH && extremeWork) {
+      decision = DECISIONS.DELAY;
+      reason = 'Queued — extreme focus, urgent held briefly';
     } else if (priority === PRIORITY.MEDIUM) {
       decision = DECISIONS.DELAY;
       reason = 'Queued — protecting deep focus';
+    } else if (taskRelevant && taskType === 'CODING') {
+      decision = DECISIONS.ALLOW;
+      reason = 'Allowed — directly relevant to your coding task';
     } else {
       decision = DECISIONS.BLOCK;
       reason = 'Blocked — low priority during deep work';
     }
+
   } else if (userState === USER_STATES.LIGHT_FOCUS) {
-    if (priority === PRIORITY.HIGH || relevance === 'HIGH') {
+    if (priority === PRIORITY.HIGH) {
       decision = DECISIONS.ALLOW;
-      reason = 'Allowed during light focus';
+      reason = 'High priority — allowed during light focus';
     } else if (priority === PRIORITY.MEDIUM && relevance !== 'LOW') {
       decision = DECISIONS.ALLOW;
-      reason = 'Allowed during light focus';
-    } else {
+      reason = 'Relevant — allowed during light focus';
+    } else if (priority === PRIORITY.MEDIUM) {
       decision = DECISIONS.DELAY;
       reason = 'Queued — low relevance during light focus';
-    }
-  } else {
-    if (priority === PRIORITY.LOW && relevance === 'LOW') {
-      decision = DECISIONS.DELAY;
-      reason = 'Low relevance — queued';
-    } else {
+    } else if (taskRelevant && taskType === 'CODING') {
       decision = DECISIONS.ALLOW;
-      reason = 'Casual browsing — allowed';
+      reason = 'Allowed — directly relevant to your coding task';
+    } else {
+      decision = DECISIONS.DELAY;
+      reason = 'Queued — low priority during light focus';
     }
+
+  } else {
+    // Casual — allow everything, no queuing
+    decision = DECISIONS.ALLOW;
+    reason = 'Casual browsing — allowed';
   }
 
   return { ...notification, decision, reason, decidedAt: Date.now() };
 }
 
-// Determine interaction permissions based on user state
+// ─── Interaction Level ────────────────────────────────────────────────────────
+
 export function getInteractionLevel(userState) {
   const levels = {
-    [USER_STATES.DEEP_FOCUS]: { canView: false, canAct: false, label: 'No interactions' },
-    [USER_STATES.LIGHT_FOCUS]: { canView: true, canAct: false, label: 'View only' },
-    [USER_STATES.CASUAL]: { canView: true, canAct: true, label: 'Full actions' },
-    [USER_STATES.IDLE]: { canView: true, canAct: true, label: 'Full actions' },
+    [USER_STATES.DEEP_FOCUS]:  { canView: false, canAct: false, label: 'No interactions' },
+    [USER_STATES.LIGHT_FOCUS]: { canView: true,  canAct: false, label: 'View only' },
+    [USER_STATES.CASUAL]:      { canView: true,  canAct: true,  label: 'Full actions' },
+    [USER_STATES.IDLE]:        { canView: true,  canAct: true,  label: 'Full actions' },
   };
   return levels[userState] || levels[USER_STATES.CASUAL];
-}
-
-// Compute interruptibility score from all signals
-export function computeInterruptibilityScore(signals) {
-  const {
-    idleState,
-    tabUrl,
-    tabSwitchRate,
-    timeSinceLastSwitch,
-    typingSpeed = 0,
-    mouseActivity = 0,
-    mouseIdleMs = 0,
-  } = signals;
-
-  if (idleState === 'idle' || idleState === 'locked') return 100;
-
-  let score = 50;
-
-  // URL-based base score
-  const deepFocusUrls = ['docs.google', 'notion.so', 'github.com', 'figma.com',
-    'vscode', 'codesandbox', 'replit', 'overleaf', 'leetcode', 'stackoverflow'];
-  const casualUrls = ['youtube', 'twitter', 'reddit', 'instagram', 'netflix', 'news', 'twitch'];
-  const commUrls = ['mail.google', 'slack.com', 'discord.com', 'teams.microsoft', 'web.whatsapp'];
-
-  const url = tabUrl || '';
-  if (deepFocusUrls.some(u => url.includes(u))) score = 20;
-  else if (commUrls.some(u => url.includes(u))) score = 65;
-  else if (casualUrls.some(u => url.includes(u))) score = 85;
-  else score = 50;
-
-  // Typing speed (most important signal)
-  if (typingSpeed > 20)      score = Math.max(score - 25, 5);
-  else if (typingSpeed > 10) score = Math.max(score - 15, 10);
-  else if (typingSpeed > 3)  score = Math.max(score - 5, 15);
-  else if (typingSpeed === 0) score = Math.min(score + 15, 95);
-
-  // Mouse inactivity
-  if (mouseIdleMs > 120000)     score = Math.min(score + 20, 100);
-  else if (mouseIdleMs > 30000) score = Math.min(score + 10, 95);
-
-  // High mouse activity = browsing
-  if (mouseActivity > 100) score = Math.min(score + 10, 90);
-
-  // Tab switching
-  if (tabSwitchRate > 8)      score = Math.min(score + 20, 100);
-  else if (tabSwitchRate > 4) score = Math.min(score + 10, 90);
-
-  // Stability bonus
-  if (timeSinceLastSwitch > 10 * 60 * 1000)     score = Math.max(score - 15, 5);
-  else if (timeSinceLastSwitch > 5 * 60 * 1000) score = Math.max(score - 8, 10);
-
-  return Math.round(Math.max(0, Math.min(100, score)));
-}
-
-export function scoreToUserState(score) {
-  if (score <= 25) return USER_STATES.DEEP_FOCUS;
-  if (score <= 55) return USER_STATES.LIGHT_FOCUS;
-  if (score <= 85) return USER_STATES.CASUAL;
-  return USER_STATES.IDLE;
 }

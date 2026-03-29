@@ -9,7 +9,8 @@
     "storage",
     "notifications",
     "identity",
-    "alarms"
+    "alarms",
+    "audio-capture"
   ],
   "host_permissions": [
     "https://web.whatsapp.com/*",
@@ -32,9 +33,6 @@
       "run_at": "document_idle"
     }
   ],
-  "action": {
-    "default_popup": "popup/index.html"
-  },
   "oauth2": {
     "client_id": "584688709989-u3204tcosaj132nh0fea4l5k9404ejqp.apps.googleusercontent.com",
     "scopes": [
@@ -42,10 +40,16 @@
       "https://www.googleapis.com/auth/gmail.readonly"
     ]
   },
+  "action": {
+    "default_popup": "popup/index.html",
+    "default_icon": {
+      "48": "icons/icon48.png"
+    }
+  },
   "web_accessible_resources": [
     {
-      "resources": ["popup/*"],
-      "matches": ["<all_urls>"]
+      "resources": ["popup/*", "icons/*", "whatsappInjector.js"],
+      "matches": ["https://web.whatsapp.com/*", "<all_urls>"]
     }
   ]
 }
