@@ -40,8 +40,16 @@ Every knowledge worker is interrupted every **2 minutes** on average. After each
 > All replies are **real** — they appear in your actual apps on your phone and desktop instantly. No simulation.
 
 ---
+<img width="1919" height="959" alt="Screenshot 2026-03-29 113819" src="https://github.com/user-attachments/assets/8af4d78e-1a04-437a-bf27-021b2472a3c4" />
+<img width="1918" height="971" alt="Screenshot 2026-03-30 223400" src="https://github.com/user-attachments/assets/273a984e-35f4-45a6-9463-5cb2b8aa4e1f" />
+<img width="1080" height="1350" alt="demoo" src="https://github.com/user-attachments/assets/ad02fa24-dcdd-431c-81b4-7f379803fe53" />
+<img width="1919" height="979" alt="Screenshot 2026-03-31 001853" src="https://github.com/user-attachments/assets/2ffaf163-3265-4bb6-ae9b-c15f091e3ce1" />
+<img width="1919" height="974" alt="Screenshot 2026-03-31 001909" src="https://github.com/user-attachments/assets/f04fc56a-e91f-4caf-afb2-af1e21b46a35" />
+<img width="1919" height="974" alt="Screenshot 2026-03-31 001954" src="https://github.com/user-attachments/assets/9e479ee9-3d4b-4a91-a699-7cba755ab47e" />
 
-## 🧠 The 9-Engine AI Pipeline
+
+---
+## 🧠 Core System (Multi-Layer Decision Pipeline)
 
 ### Engine 1 — Context Understanding
 Monitors 5 real-time behavioral signals every 3 seconds:
@@ -212,8 +220,16 @@ From one popup, without opening any other app:
 └─────────────────────────────────────────────────────────────┘
 ```
 
----
 
+## 🔄 How It Works (Simple Flow)
+
+1. Capture notifications (Gmail / Discord / WhatsApp)
+2. Analyze user context (focus, tab, activity)
+3. Classify notification (priority, intent, relevance)
+4. Decide action (allow / delay / block)
+5. Execute or queue action
+```
+```
 ## 📁 Project Structure
 ```
 aaie/
