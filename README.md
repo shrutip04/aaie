@@ -1,245 +1,318 @@
 # 🧠 AAIE — Attention + Action Intelligence Engine
 
-A Chrome extension that decides **when to interrupt you**, **how much to let you interact**, and **how to act across Gmail, Discord, and WhatsApp** — all from a single intelligent UI with voice control.
+> *"We don't just manage notifications. We understand attention."*
+
+A Chrome extension powered by a 9-engine AI pipeline that decides **when to interrupt you**, **what deserves your attention**, and **lets you act across Gmail, WhatsApp, Discord, and Telegram** — all from a single intelligent UI with voice control. No tab switching. No context loss.
 
 ---
 
-## Architecture
+## 🎯 The Problem
 
-```
-┌─────────────────────────────────────────────────────────┐
-│  Chrome Extension                                        │
-│                                                          │
-│  background.js    → Context Engine + Decision Engine     │
-│  content.js       → WhatsApp Web MutationObserver        │
-│  popup/ (React)   → UI: Feed, Voice, Insights            │
-└────────────────┬────────────────────────────────────────┘
-                 │ chrome.storage + runtime.sendMessage
-┌────────────────▼────────────────────────────────────────┐
-│  Backend (Node + Express)                                │
-│                                                          │
-│  /gmail  → OAuth2 + fetch/mark-read/archive              │
-│  /discord → incoming webhook + outgoing replies          │
-└─────────────────────────────────────────────────────────┘
-```
+Every knowledge worker is interrupted every **2 minutes** on average. After each interruption, it takes **23 minutes** to fully regain focus. Existing tools (Superhuman, Slack DND, Apple Focus Mode) use **static rules** — they don't know what you're doing, don't understand notification content, and can't predict the right moment to reach you.
+
+**AAIE solves this with real-time behavioral intelligence.**
 
 ---
 
-## Project Structure
+## ✨ What Makes AAIE Different
 
-```
-aaie/
-├── extension/              Chrome extension files
-│   ├── manifest.json
-│   ├── background.js       Service worker (context + decisions)
-│   ├── content.js          WhatsApp Web observer
-│   ├── decisionEngine.js   Pure decision logic
-│   └── popup/              Built React app (output of npm run build)
-│
-├── popup-src/              React source (Vite)
-│   └── src/
-│       ├── App.jsx
-│       ├── components/     Header, Feed, Card, Queue, Voice, Insights
-│       └── hooks/          useExtensionState, useVoice
-│
-├── backend/                Node.js + Express
-│   ├── server.js
-│   ├── routes/             gmail.js, discord.js
-│   └── services/           gmailService.js, discordService.js
-│
-└── generate-icons.js       Icon generator
-```
+| Feature | Superhuman | Slack DND | Apple Focus | **AAIE** |
+|---|---|---|---|---|
+| Knows what you're doing | ✗ | ✗ | ✗ | ✅ |
+| Understands notification content | Partial | ✗ | ✗ | ✅ |
+| Predicts safe interruption windows | ✗ | ✗ | ✗ | ✅ |
+| Cross-app reply without switching tabs | ✗ | ✗ | ✗ | ✅ |
+| Voice-to-text replies | ✗ | ✗ | ✗ | ✅ |
+| Learns your preferences over time | Partial | ✗ | ✗ | ✅ |
+| Notification summaries | ✗ | ✗ | ✗ | ✅ |
 
 ---
 
-## Quick Start
+## 🔌 Connected Apps (Live, Real Accounts)
 
-### 1. Clone and install
+| App | What Works |
+|-----|------------|
+| **Gmail** | Real emails via OAuth2 — mark read, archive, reply without opening Gmail |
+| **WhatsApp** | Real personal messages via WhatsApp Web DOM observer — reply sends to your actual phone |
+| **Discord** | Real server messages via Discord bot — reply via webhook to actual channel |
+| **Telegram** | Real messages via Telegram Bot API — reply goes to actual Telegram chat |
 
-```bash
-cd aaie
-npm run setup        # installs popup + backend deps
-```
-
-### 2. Build the React popup
-
-```bash
-npm run build
-# Outputs to extension/popup/
-```
-
-### 3. Set up Google OAuth
-
-1. Go to [Google Cloud Console](https://console.cloud.google.com)
-2. Create a project → Enable **Gmail API**
-3. Create OAuth 2.0 credentials (Chrome Extension type)
-4. Copy the **Client ID** into:
-   - `extension/manifest.json` → `oauth2.client_id`
-   - `backend/.env` → `GOOGLE_CLIENT_ID`
-
-### 4. Set up the backend
-
-```bash
-cd backend
-cp .env.example .env
-# Fill in GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET
-npm run dev
-```
-
-### 5. Load the extension
-
-1. Open Chrome → `chrome://extensions`
-2. Enable **Developer mode** (top right)
-3. Click **Load unpacked**
-4. Select the `extension/` folder
-5. Pin the AAIE extension
-
-### 6. Connect Gmail
-
-Click the extension icon → tap **Connect Gmail** → complete OAuth
+> All replies are **real** — they appear in your actual apps on your phone and desktop instantly. No simulation.
 
 ---
 
-## How It Works
+## 🧠 The 9-Engine AI Pipeline
 
-### Context Engine (`background.js`)
+### Engine 1 — Context Understanding
+Monitors 5 real-time behavioral signals every 3 seconds:
+- **Active tab URL** → classifies site (coding/meeting/casual/comms)
+- **Typing speed** → keystrokes per 10 seconds via content script
+- **Mouse movement velocity** → activity bursts per interval
+- **Tab switching rate** → frequency of context changes
+- **Chrome idle API** → active / idle / locked detection
 
-Monitors:
-- `chrome.idle` — detects idle/active/locked
-- `chrome.tabs.onActivated` — tracks tab switching rate
-- Active tab URL — classifies the site
+### Engine 2 — Interruptibility Scoring
+Combines all signals into a **live 0–100 score** with hysteresis smoothing to prevent flapping:
 
-Outputs a **0–100 interruptibility score** and **user state**:
+| Score | State | Example |
+|-------|-------|---------|
+| 0–35 | 🎯 Deep Focus | GitHub, Programiz, Figma, Notion |
+| 36–62 | ⚡ Light Focus | Mixed browsing with work |
+| 63–85 | 🌿 Casual | YouTube, Reddit, Instagram |
+| 86–100 | 😴 Idle | Away from keyboard |
 
-| Score | State | What it means |
-|-------|-------|---------------|
-| 0–25 | Deep Focus | Heavy work (GitHub, Notion, Figma) |
-| 26–55 | Light Focus | Mixed work |
-| 56–85 | Casual | Browsing |
-| 86–100 | Idle | Away from keyboard |
+### Engine 3 — Task-Relevance Matching
+Detects your current task context from the active URL, then matches notification content against task-specific keywords. On GitHub, a "server is down" Discord message scores **HIGH relevance**. A newsletter scores **LOW**.
 
-<img width="1919" height="1021" alt="Screenshot 2026-03-29 111815" src="https://github.com/user-attachments/assets/3cf78dc0-ee19-4f0c-a3bf-ab37b9fdac87" />
-<img width="1919" height="977" alt="image" src="https://github.com/user-attachments/assets/0862e4e3-fa7b-4c64-aab1-d35840e89f07" />
-<img width="1919" height="959" alt="image" src="https://github.com/user-attachments/assets/edc28463-1f34-4b68-b945-1f6f046509fd" />
+### Engine 4 — Interruption Cost Calculation
+Estimates the cognitive cost of breaking your current flow based on:
+- How long you've been on the same task
+- Your current typing intensity
+- Session depth score
 
+### Engine 5 — Decision Engine
+Routes every notification through a decision matrix:
 
-### Decision Engine (`decisionEngine.js`)
-
-For each notification, computes:
-- **Priority**: HIGH / MEDIUM / LOW (keyword heuristics)
-- **Intent**: MESSAGE / TASK / CALL / INFO
-- **Relevance**: HIGH / MEDIUM / LOW
-
-Decision matrix:
-
-| State | HIGH | MEDIUM | LOW |
-|-------|------|--------|-----|
+| State | HIGH Priority | MEDIUM Priority | LOW Priority |
+|-------|--------------|-----------------|--------------|
 | Deep Focus | ALLOW | DELAY | BLOCK |
-| Light Focus | ALLOW | ALLOW | DELAY |
+| Light Focus | ALLOW | ALLOW/DELAY | DELAY |
 | Casual | ALLOW | ALLOW | DELAY |
 | Idle | ALLOW | ALLOW | ALLOW |
 
-### Interaction Control
+### Engine 6 — Predictive Timing (Safe Window Detection)
+Detects when you're about to take a break by monitoring:
+- Typing speed dropping to zero after an active session
+- Tab switches after a long focus period
+- Mouse inactivity thresholds
 
-| State | Can View | Can Act |
-|-------|----------|---------|
-| Deep Focus | ✗ | ✗ |
-| Light Focus | ✓ | ✗ |
-| Casual / Idle | ✓ | ✓ |
+Queued notifications are released automatically at these safe windows — nothing is lost, just optimally timed.
 
-### WhatsApp Integration (`content.js`)
+### Engine 7 — Cognitive Load Monitor
+Detects mental overload by combining:
+- Rapid tab switching (>6 switches/min)
+- Erratic mouse movement (>200 events/interval)
+- Sustained high typing speed (>30 keys/10s)
 
-- Uses `MutationObserver` on the WhatsApp Web DOM
-- Extracts: sender name, message text, timestamp
-- Can inject reply text and simulate Send click
-- No official API needed — pure DOM manipulation
+Shows a live cognitive load bar (LOW / MEDIUM / HIGH) with break suggestions.
 
-### Voice Commands (`useVoice.js`)
+### Engine 8 — Notification Summary
+Instead of overwhelming you with individual notifications, AAIE compresses them into a **single intelligent summary** after a focus session:
+- Grouped by source (Gmail, WhatsApp, Discord, Telegram)
+- Urgency-ranked with callouts for HIGH priority items
+- AI-generated plain-English briefing
+- Expandable per-source breakdown
 
-Uses the Web Speech API (built into Chrome). Supported commands:
-
-| Say | Action |
-|-----|--------|
-| "Mark email as read" | Marks top Gmail email |
-| "Archive" | Archives top email |
-| "Reply okay" | Sends "Okay!" |
-| "Reply I'll do it later" | Sends canned reply |
-| "What did I miss?" | Shows queue count |
-| "Flush the queue" | Releases all delayed |
-| "Ignore this" | Dismisses top notification |
-| "Reply [anything]" | Sends custom text |
-
-### Discord Integration
-
-**Incoming**: POST `/discord/incoming` — receives messages from a Discord bot/webhook, stores them, extension polls `GET /discord/messages`.
-
-**Outgoing**: POST `/discord/send` with `webhookUrl` + `content` — sends reply via Discord webhook.
+### Engine 9 — Learning Layer
+Tracks every interaction (opened, dismissed, replied, archived) and adapts:
+- **Priority senders** auto-boosted (people you always respond to)
+- **Frequent dismissals** auto-reduced (newsletters you always ignore)
+- Keyword weight adjustments per source
+- Persisted across sessions via `chrome.storage.local`
 
 ---
 
-## Setting Up Discord
+## 🎤 Voice-to-Text Replies
 
-1. In your Discord server: **Settings → Integrations → Webhooks → New Webhook**
-2. Copy the webhook URL
-3. In the extension notification card, the webhook URL is stored with each Discord message
-4. Replies go out via that webhook automatically
+Speak naturally — AAIE converts, refines with AI, and sends to the real app:
 
-For **incoming** Discord messages:
-- Create a Discord bot
-- Add a message listener that POSTs to `http://localhost:3001/discord/incoming`
-- Or use a Discord bot framework like discord.js
+| You say | AI refines to | Sent via |
+|---------|--------------|----------|
+| "tell mom I'll call later" | "Hey Mom, I'll call you a bit later 🙂" | WhatsApp (real) |
+| "reply I'm in a meeting" | "I'm currently in a meeting, will get back to you soon." | Gmail/Discord (real) |
+| "mark email as read" | — | Gmail API |
+| "flush the queue" | — | Releases all delayed |
+| "archive this" | — | Gmail API |
+
+**Reply Mode** shows exactly who you're replying to and previews the AI-refined message before sending. The reply **appears instantly in the real app** on your phone.
 
 ---
 
-## Development
+## 🗂 Notification Summary Tab
 
-```bash
-# Watch mode (rebuilds popup on file change)
-npm run watch
+After focus sessions, instead of 15 individual cards:
+```
+WHILE YOU WERE DEEP FOCUS
+37 notifications managed
 
-# Run backend
-npm run backend
+✓ 8 shown  ⏸ 22 queued  🛡 7 blocked
 
-# Test Discord incoming webhook
-curl -X POST http://localhost:3001/discord/test \
-  -H "Content-Type: application/json" \
-  -d '{"sender": "Alex", "content": "URGENT: server is down!"}'
+🚨 NEEDS ATTENTION (3 urgent)
+  📧 Sarah Chen — URGENT: Server down
+  💬 DevTeam — PR #247 needs review
+  ✈️ Alex — Can you join the call?
+
+By Source
+  📩 Gmail · 12 total (2 urgent)
+  💬 Discord · 8 total (1 urgent)
+  💚 WhatsApp · 11 total
+  ✈️ Telegram · 6 total
+
+🧠 AI Summary
+You have 3 urgent messages that need attention.
+22 notifications were held back to protect your focus.
+7 low-priority items were automatically blocked.
 ```
 
 ---
 
-## Tech Stack
+## 🔔 Interaction Control
 
-| Layer | Tech |
-|-------|------|
-| Extension UI | React 18, Vite, Tailwind CSS |
-| Extension Logic | Chrome Extension MV3, background.js, content.js |
-| Chrome APIs | tabs, idle, storage, notifications, identity |
-| Backend | Node.js, Express |
-| Gmail | Google APIs (googleapis) + OAuth2 |
-| Discord | Webhook-based (no bot required for basic use) |
-| WhatsApp | DOM content script + MutationObserver |
-| Voice | Web Speech API (browser-native) |
+AAIE gates what you can do based on focus state — preventing the extension itself from becoming a distraction:
+
+| State | Can See Notifications | Can Reply/Act |
+|-------|----------------------|---------------|
+| Deep Focus | ✗ Hidden | ✗ Locked |
+| Light Focus | ✓ View only | ✗ Locked |
+| Casual / Idle | ✓ Full feed | ✓ Full actions |
 
 ---
 
-## File Reference
+## ⚡ Single-Extension Actions (No Tab Switching)
 
-| File | Purpose |
-|------|---------|
-| `extension/manifest.json` | Extension config, permissions, OAuth |
-| `extension/background.js` | Service worker: context + decisions + Gmail polling |
-| `extension/content.js` | WhatsApp Web DOM observer + message injection |
-| `extension/decisionEngine.js` | Pure logic: classify, decide, score |
-| `popup-src/src/App.jsx` | Main app: tabs, action dispatch, voice routing |
-| `popup-src/src/hooks/useExtensionState.js` | Chrome storage bridge |
-| `popup-src/src/hooks/useVoice.js` | Web Speech API + intent parser |
-| `popup-src/src/components/Header.jsx` | State card + interruptibility bar |
-| `popup-src/src/components/NotificationCard.jsx` | Individual notification |
-| `popup-src/src/components/VoiceUI.jsx` | Mic button + quick commands |
-| `popup-src/src/components/Insights.jsx` | Focus stats |
-| `backend/server.js` | Express app |
-| `backend/routes/gmail.js` | Gmail OAuth + email actions |
-| `backend/routes/discord.js` | Discord webhook relay |
-| `backend/services/gmailService.js` | Gmail API wrapper |
-| `backend/services/discordService.js` | Discord logic |
+From one popup, without opening any other app:
+
+- **Gmail** → Mark as read, Archive, Reply
+- **WhatsApp** → Quick replies (On it!, Give me 5 mins, etc.), custom reply → sends to phone
+- **Discord** → Reply via webhook → appears in real channel
+- **Telegram** → Reply → appears in real Telegram chat
+- **All sources** → Dismiss, view priority/relevance badges
+
+---
+
+## 🏗 Architecture
+```
+┌─────────────────────────────────────────────────────────────┐
+│  Chrome Extension (MV3)                                      │
+│                                                              │
+│  background.js     → 9-Engine Pipeline + Decision Layer      │
+│  decisionEngine.js → Pure scoring + classification logic     │
+│  contentSignals.js → Typing speed + mouse signals (all tabs) │
+│  content.js        → WhatsApp Web DOM observer + injector    │
+│  whatsappInjector.js → Page-world Notification interceptor   │
+│  popup/ (React)    → Feed, Summary, Voice, Insights UI       │
+└──────────────────────┬──────────────────────────────────────┘
+                       │ chrome.storage + runtime.sendMessage
+┌──────────────────────▼──────────────────────────────────────┐
+│  Backend (Node.js + Express)                                 │
+│                                                              │
+│  /gmail     → OAuth2 + Gmail API (read/archive/mark)         │
+│  /discord   → Incoming webhook relay + outgoing replies      │
+│  /telegram  → Bot API polling + send messages                │
+└─────────────────────────────────────────────────────────────┘
+                       │
+┌──────────────────────▼──────────────────────────────────────┐
+│  External Services                                           │
+│                                                              │
+│  Gmail API (googleapis)                                      │
+│  Discord Bot (discord.js) + Webhooks                         │
+│  Telegram Bot API                                            │
+│  WhatsApp Web DOM (no API — pure browser interception)       │
+│  Anthropic Claude API (voice reply refinement)               │
+└─────────────────────────────────────────────────────────────┘
+```
+
+---
+
+## 📁 Project Structure
+```
+aaie/
+├── extension/
+│   ├── manifest.json          Permissions, OAuth, content scripts
+│   ├── background.js          Service worker: all 9 engines
+│   ├── decisionEngine.js      Scoring, classification, decisions
+│   ├── contentSignals.js      Typing + mouse tracking (all pages)
+│   ├── content.js             WhatsApp Web observer + reply injector
+│   ├── whatsappInjector.js    Page-world Notification interceptor
+│   └── popup/                 Built React app (output of npm run build)
+│
+├── popup-src/
+│   └── src/
+│       ├── App.jsx
+│       ├── components/
+│       │   ├── Header.jsx         Live score ring + context mode badge
+│       │   ├── NotificationFeed.jsx
+│       │   ├── NotificationCard.jsx   Per-card actions + quick replies
+│       │   ├── QueueSection.jsx   Expandable queue with release
+│       │   ├── Summary.jsx        Notification summary + AI briefing
+│       │   ├── VoiceUI.jsx        Voice-to-text + AI reply refinement
+│       │   └── Insights.jsx       Cognitive load + learning layer
+│       └── hooks/
+│           ├── useExtensionState.js   Chrome storage bridge
+│           └── useVoice.js            Web Speech API
+│
+├── backend/
+│   ├── server.js
+│   ├── bot.js                 Discord.js bot (real message forwarding)
+│   ├── routes/
+│   │   ├── gmail.js
+│   │   ├── discord.js
+│   │   └── telegram.js
+│   └── services/
+│       ├── gmailService.js
+│       ├── discordService.js
+│       └── telegramService.js
+│
+└── generate-icons.js
+```
+
+---
+
+## 🚀 Quick Start
+```bash
+# 1. Install all dependencies
+npm run setup
+
+# 2. Build the React popup
+npm run build
+
+# 3. Start backend
+cd backend && npm run dev
+
+# 4. Start Discord bot (separate terminal)
+cd backend && npm run bot
+
+# 5. Load extension in Chrome
+# chrome://extensions → Developer mode → Load unpacked → select extension/
+```
+
+---
+
+## 🧪 Testing
+```bash
+# Fire a test Discord notification
+Invoke-WebRequest -Uri "http://localhost:3001/discord/test" \
+  -Method POST \
+  -Headers @{"Content-Type"="application/json"} \
+  -Body '{"sender": "Alex", "content": "URGENT: server is down!"}' \
+  -UseBasicParsing
+
+# Check backend health
+curl http://localhost:3001/health
+```
+
+---
+
+## 🛠 Tech Stack
+
+| Layer | Technology |
+|-------|------------|
+| Extension UI | React 18 + Vite |
+| Extension Logic | Chrome MV3, Service Worker |
+| Chrome APIs | tabs, idle, storage, notifications, identity, alarms |
+| Context Signals | Content Scripts (keydown, mousemove, iframe support) |
+| Backend | Node.js + Express |
+| Gmail | Google APIs OAuth2 + REST |
+| Discord | discord.js bot + Webhook API |
+| Telegram | Telegram Bot API (polling) |
+| WhatsApp | DOM MutationObserver + Notification interceptor |
+| Voice | Web Speech API (browser-native, zero dependencies) |
+| AI Reply Refinement | Anthropic Claude API (claude-sonnet-4) |
+| Learning Layer | chrome.storage.local (persistent, private) |
+| NLP Classification | Custom keyword engine (<1ms, no external ML) |
+
+---
+
+## 🏆 One-Line Summary
+
+> **"AAIE understands attention, controls interruptions, and enables effortless cross-app communication — all from a single extension, in real time, with zero context switching."**
